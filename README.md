@@ -1,3 +1,8 @@
+![GitHub repo size](https://img.shields.io/github/repo-size/sravanpallapothu/google-slides-formatting-scripts)
+![GitHub contributors](https://img.shields.io/github/contributors/sravanpallapothu/google-slides-formatting-scripts)
+
+
+
 # Google Slides Formatter — Apps Script Collection
 
 A collection of Google Apps Script functions that automate formatting and standardisation tasks across Google Slides presentations. Designed for teams that work with large decks built from slides copied across multiple sources, where fonts, colours, positions and sizes tend to drift from brand standards over time.
