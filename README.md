@@ -6,7 +6,7 @@ A collection of Google Apps Script functions that automate formatting and standa
 
 ## What It Does
 
-The collection contains 9 scripts that can be run individually or all at once via a single master function:
+The collection contains 9 scripts (all scripts.txt) that can be run individually or all at once via a single master function:
 
 | Script | Function | Description |
 |--------|----------|-------------|
