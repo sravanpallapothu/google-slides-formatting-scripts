@@ -1,0 +1,606 @@
+// ═════════════════════════════════════════════════════════════════════════════
+// GOOGLE SLIDES FORMATTER — COMPLETE SCRIPT COLLECTION
+// ═════════════════════════════════════════════════════════════════════════════
+//
+// HOW TO USE:
+// 1. Open your Google Slides presentation
+// 2. Click Extensions → Apps Script
+// 3. Delete any existing code in the editor
+// 4. Paste this entire file into the editor
+// 5. Click Save (💾)
+// 6. Select "runAllScripts" from the dropdown and click Run (▶️)
+//    OR select any individual function to run just that one
+//
+// IMPORTANT: Always work on a COPY of your deck — changes cannot be undone.
+//
+// SCRIPTS INCLUDED:
+//   1. runAllScripts()           — Master runner: runs all scripts in sequence
+//   2. formatTitles()            — Title font, size, colour, position
+//   3. formatBodyText()          — Body text left-alignment and width trimming
+//   4. formatLayout()            — Icon spacing, body/footnote alignment
+//   5. standardiseBackground()   — Uniform white background on all slides
+//   6. standardiseDimensions()   — Set slide size to 4:3 (10 x 7.5 inches)
+//   7. standardiseLineSpacing()  — Single line spacing on all body text
+//   8. standardiseFont()         — Palatino Linotype, 25pt titles, 18pt body
+//   9. standardiseTextBoxWidth() — Trim all body text boxes to 11.75 inches
+//
+// YOUR CURRENT SETTINGS (edit these at the top of each function):
+//   Font:             Palatino Linotype
+//   Title size:       25pt
+//   Body size:        18pt
+//   Title colour:     #016976
+//   Title position:   X = 0.43in, Y = 0.12in
+//   Left guide:       1.15in
+//   Right guide:      12.18in
+//   Max text width:   11.75in
+//   Background:       #FFFFFF (white)
+//   Slide size:       10 x 7.5 inches (4:3)
+//   Line spacing:     100% (single)
+// ═════════════════════════════════════════════════════════════════════════════
+
+
+
+
+// ─────────────────────────────────────────────────────────────────────────────
+// SCRIPT 1 — MASTER RUNNER
+// Runs all scripts in the correct order. Start here for a full reformat.
+// ─────────────────────────────────────────────────────────────────────────────
+
+function runAllScripts() {
+  var ui = SlidesApp.getUi();
+
+  // Confirm before running — this cannot be undone
+  var confirm = ui.alert(
+    "Run All Formatting Scripts?",
+    "This will apply all formatting scripts to your presentation in sequence.\n\n" +
+    "This CANNOT be undone. Make sure you are working on a copy.\n\n" +
+    "Click OK to proceed or Cancel to stop.",
+    ui.ButtonSet.OK_CANCEL
+  );
+
+  if (confirm !== ui.Button.OK) {
+    ui.alert("Cancelled. No changes were made.");
+    return;
+  }
+
+  Logger.log("=== MASTER SCRIPT STARTED ===");
+
+  // Dimensions first — resizing the slide can shift elements, so do this
+  // before any positioning scripts run
+  try { standardiseDimensions();    Logger.log("✓ Step 1: Dimensions done."); }
+  catch(e) { Logger.log("✗ Step 1: Dimensions failed — " + e); }
+
+  // Background second — purely cosmetic, no effect on layout
+  try { standardiseBackground();    Logger.log("✓ Step 2: Background done."); }
+  catch(e) { Logger.log("✗ Step 2: Background failed — " + e); }
+
+  // Titles third — establishes the left edge everything else aligns to
+  try { formatTitles();             Logger.log("✓ Step 3: Titles done."); }
+  catch(e) { Logger.log("✗ Step 3: Titles failed — " + e); }
+
+  // Body text fourth — aligns to title edge set in step 3
+  try { formatBodyText();           Logger.log("✓ Step 4: Body text done."); }
+  catch(e) { Logger.log("✗ Step 4: Body text failed — " + e); }
+
+  // Layout fifth — icon spacing and footnote alignment
+  try { formatLayout();             Logger.log("✓ Step 5: Layout done."); }
+  catch(e) { Logger.log("✗ Step 5: Layout failed — " + e); }
+
+  // Font sixth — after layout so nothing repositions after font change
+  try { standardiseFont();          Logger.log("✓ Step 6: Font done."); }
+  catch(e) { Logger.log("✗ Step 6: Font failed — " + e); }
+
+  // Line spacing seventh — after font since spacing can affect layout
+  try { standardiseLineSpacing();   Logger.log("✓ Step 7: Line spacing done."); }
+  catch(e) { Logger.log("✗ Step 7: Line spacing failed — " + e); }
+
+  // Text box width last — final trim to ensure nothing overflows guides
+  try { standardiseTextBoxWidth();  Logger.log("✓ Step 8: Text box width done."); }
+  catch(e) { Logger.log("✗ Step 8: Text box width failed — " + e); }
+
+  Logger.log("=== MASTER SCRIPT COMPLETE ===");
+
+  ui.alert(
+    "All Done!",
+    "All formatting scripts have run.\n\n" +
+    "Go to View > Logs to see a full report of what was changed and any errors.",
+    ui.ButtonSet.OK
+  );
+}
+
+
+
+
+// ─────────────────────────────────────────────────────────────────────────────
+// SCRIPT 2 — FORMAT TITLES
+// Sets font, size, colour, bold/italic/underline and position of title text
+// boxes on every slide. Identifies the title as the topmost text element
+// within the top 1.5 inches of each slide.
+// ─────────────────────────────────────────────────────────────────────────────
+
+function formatTitles() {
+  var pres = SlidesApp.getActivePresentation();
+  var slides = pres.getSlides();
+
+  // ── YOUR RULES ────────────────────────────────────────────────────────────
+  var FONT_SIZE   = 25;
+  var FONT_FAMILY = "Palatino Linotype";
+  var FONT_COLOR  = "#016976";
+  var POS_X_PT    = 0.43 * 72;  // 0.43 inches from left
+  var POS_Y_PT    = 0.12 * 72;  // 0.12 inches from top
+  // ─────────────────────────────────────────────────────────────────────────
+
+  var TOP_ZONE_PT = 1.5 * 72;
+
+  slides.forEach(function(slide, i) {
+    var elements = slide.getPageElements();
+    var titleElement = null;
+    var highestTop = Infinity;
+
+    // Find the topmost text-containing element within the top 1.5 inches
+    elements.forEach(function(el) {
+      var topPos;
+      try { topPos = el.getTop(); } catch(e) { return; }
+      if (topPos > TOP_ZONE_PT) return;
+      var text = null;
+      try { text = el.asShape().getText().asString().trim(); } catch(e) { return; }
+      if (!text) return;
+      if (topPos < highestTop) { highestTop = topPos; titleElement = el; }
+    });
+
+    // No title found in top zone — skip this slide
+    if (!titleElement) {
+      Logger.log("Slide " + (i+1) + ": no title found, skipping.");
+      return;
+    }
+
+    // Apply font formatting
+    try {
+      var style = titleElement.asShape().getText().getTextStyle();
+      style.setFontSize(FONT_SIZE);
+      style.setFontFamily(FONT_FAMILY);
+      style.setForegroundColor(FONT_COLOR);
+      style.setBold(false);
+      style.setItalic(false);
+      style.setUnderline(false);
+      Logger.log("Slide " + (i+1) + ": title formatted.");
+    } catch(e) {
+      Logger.log("Slide " + (i+1) + ": title formatting failed — " + e);
+    }
+
+    // Apply position
+    try {
+      titleElement.setLeft(POS_X_PT);
+      titleElement.setTop(POS_Y_PT);
+      Logger.log("Slide " + (i+1) + ": title positioned.");
+    } catch(e) {
+      Logger.log("Slide " + (i+1) + ": title position failed — " + e);
+    }
+  });
+
+  Logger.log("Script 2 (formatTitles) complete.");
+}
+
+
+
+
+// ─────────────────────────────────────────────────────────────────────────────
+// SCRIPT 3 — FORMAT BODY TEXT
+// Left-aligns all body text boxes to the same X position as the title.
+// Trims any text box that overflows past the right guide (12.18 inches).
+// Skips the title element on each slide.
+// ─────────────────────────────────────────────────────────────────────────────
+
+function formatBodyText() {
+  var pres = SlidesApp.getActivePresentation();
+  var slides = pres.getSlides();
+
+  // ── YOUR RULES ────────────────────────────────────────────────────────────
+  var POS_X_PT     = 0.43  * 72;  // Left edge — matches title position
+  var RIGHT_GUIDE  = 12.18 * 72;  // Right vertical guideline
+  var MAX_WIDTH_PT = RIGHT_GUIDE - POS_X_PT; // = 11.75 inches
+  // ─────────────────────────────────────────────────────────────────────────
+
+  var TOP_ZONE_PT = 1.5 * 72;
+
+  slides.forEach(function(slide, i) {
+    var elements = slide.getPageElements();
+
+    // Identify the title to skip it
+    var titleElement = null;
+    var highestTop = Infinity;
+    elements.forEach(function(el) {
+      var topPos;
+      try { topPos = el.getTop(); } catch(e) { return; }
+      if (topPos > TOP_ZONE_PT) return;
+      var text = null;
+      try { text = el.asShape().getText().asString().trim(); } catch(e) { return; }
+      if (!text) return;
+      if (topPos < highestTop) { highestTop = topPos; titleElement = el; }
+    });
+
+    elements.forEach(function(el) {
+      if (el === titleElement) return;
+
+      var text = null;
+      try { text = el.asShape().getText().asString().trim(); } catch(e) { return; }
+      if (!text) return;
+
+      // Left-align to title edge
+      try {
+        el.setLeft(POS_X_PT);
+        Logger.log("Slide " + (i+1) + ": body left-aligned.");
+      } catch(e) {
+        Logger.log("Slide " + (i+1) + ": could not set left — " + e);
+      }
+
+      // Trim width if overflowing past right guideline
+      try {
+        if (el.getWidth() > MAX_WIDTH_PT) {
+          el.setWidth(MAX_WIDTH_PT);
+          Logger.log("Slide " + (i+1) + ": body width trimmed.");
+        }
+      } catch(e) {
+        Logger.log("Slide " + (i+1) + ": could not set width — " + e);
+      }
+    });
+  });
+
+  Logger.log("Script 3 (formatBodyText) complete.");
+}
+
+
+
+
+// ─────────────────────────────────────────────────────────────────────────────
+// SCRIPT 4 — FORMAT LAYOUT (ICONS + FOOTNOTES)
+// Evenly spaces images/icons horizontally within the guide boundaries.
+// Left-aligns body text and footnotes to the title edge.
+// Skips slides with no images (not an icon slide).
+// NOTE: Icon labels are NOT repositioned — their positions vary per slide.
+// ─────────────────────────────────────────────────────────────────────────────
+
+function formatLayout() {
+  var pres = SlidesApp.getActivePresentation();
+  var slides = pres.getSlides();
+
+  // ── YOUR RULES ────────────────────────────────────────────────────────────
+  var LEFT_EDGE_PT   = 0.43  * 72;  // Left alignment edge (matches title)
+  var RIGHT_GUIDE_PT = 12.18 * 72;  // Right vertical guideline
+  var LEFT_GUIDE_PT  = 1.15  * 72;  // Left vertical guideline (for icon centering)
+  var MAX_WIDTH_PT   = RIGHT_GUIDE_PT - LEFT_EDGE_PT;
+
+  // Footnote detection: small text near the bottom of the slide
+  var FOOTNOTE_MAX_CHARS = 300;
+  var FOOTNOTE_ZONE_PT   = 6.5 * 72;
+  // ─────────────────────────────────────────────────────────────────────────
+
+  var TOP_ZONE_PT = 1.5 * 72;
+
+  slides.forEach(function(slide, i) {
+    var elements = slide.getPageElements();
+
+    // Identify the title
+    var titleElement = null;
+    var highestTop = Infinity;
+    elements.forEach(function(el) {
+      var topPos;
+      try { topPos = el.getTop(); } catch(e) { return; }
+      if (topPos > TOP_ZONE_PT) return;
+      var text = null;
+      try { text = el.asShape().getText().asString().trim(); } catch(e) { return; }
+      if (!text) return;
+      if (topPos < highestTop) { highestTop = topPos; titleElement = el; }
+    });
+
+    // Collect all images on this slide
+    var icons = [];
+    elements.forEach(function(el) {
+      try {
+        if (el.getPageElementType() === SlidesApp.PageElementType.IMAGE) {
+          icons.push(el);
+        }
+      } catch(e) {}
+    });
+
+    // Evenly space icons within guide boundaries (only if icons exist)
+    if (icons.length > 0) {
+      icons.sort(function(a, b) { return a.getLeft() - b.getLeft(); });
+      var guideWidth = RIGHT_GUIDE_PT - LEFT_GUIDE_PT;
+      var totalIconWidth = 0;
+      icons.forEach(function(icon) { totalIconWidth += icon.getWidth(); });
+      var spacing = (guideWidth - totalIconWidth) / (icons.length + 1);
+      var currentX = LEFT_GUIDE_PT + spacing;
+      icons.forEach(function(icon) {
+        try {
+          icon.setLeft(currentX);
+          currentX += icon.getWidth() + spacing;
+          Logger.log("Slide " + (i+1) + ": icon repositioned.");
+        } catch(e) {
+          Logger.log("Slide " + (i+1) + ": could not reposition icon — " + e);
+        }
+      });
+    } else {
+      Logger.log("Slide " + (i+1) + ": no icons found, skipping icon spacing.");
+    }
+
+    // Left-align body text and footnotes
+    elements.forEach(function(el) {
+      if (el === titleElement) return;
+      var text = null;
+      try { text = el.asShape().getText().asString().trim(); } catch(e) { return; }
+      if (!text) return;
+
+      var topPos;
+      try { topPos = el.getTop(); } catch(e) { return; }
+      var isFootnote = (topPos > FOOTNOTE_ZONE_PT && text.length < FOOTNOTE_MAX_CHARS);
+
+      try {
+        el.setLeft(LEFT_EDGE_PT);
+        Logger.log("Slide " + (i+1) + ": " + (isFootnote ? "footnote" : "body") + " left-aligned.");
+      } catch(e) {
+        Logger.log("Slide " + (i+1) + ": could not align element — " + e);
+      }
+
+      try {
+        if (el.getWidth() > MAX_WIDTH_PT) {
+          el.setWidth(MAX_WIDTH_PT);
+          Logger.log("Slide " + (i+1) + ": element width trimmed.");
+        }
+      } catch(e) {
+        Logger.log("Slide " + (i+1) + ": could not set width — " + e);
+      }
+    });
+  });
+
+  Logger.log("Script 4 (formatLayout) complete.");
+}
+
+
+
+
+// ─────────────────────────────────────────────────────────────────────────────
+// SCRIPT 5 — STANDARDISE BACKGROUND COLOUR
+// Sets the background of every slide to a solid white colour.
+// Useful when slides copied from other decks bring different backgrounds.
+// ─────────────────────────────────────────────────────────────────────────────
+
+function standardiseBackground() {
+  var pres = SlidesApp.getActivePresentation();
+  var slides = pres.getSlides();
+
+  // ── YOUR RULES ────────────────────────────────────────────────────────────
+  var BACKGROUND_COLOR = "#FFFFFF"; // White
+  // ─────────────────────────────────────────────────────────────────────────
+
+  slides.forEach(function(slide, i) {
+    try {
+      slide.getBackground().setSolidFill(BACKGROUND_COLOR);
+      Logger.log("Slide " + (i+1) + ": background set to " + BACKGROUND_COLOR);
+    } catch(e) {
+      Logger.log("Slide " + (i+1) + ": failed to set background — " + e);
+    }
+  });
+
+  Logger.log("Script 5 (standardiseBackground) complete.");
+}
+
+
+
+
+// ─────────────────────────────────────────────────────────────────────────────
+// SCRIPT 6 — STANDARDISE SLIDE DIMENSIONS
+// Sets the presentation to a standard 4:3 page size (10 x 7.5 inches).
+// This applies to all slides since dimensions are a presentation-level setting.
+//
+// WARNING: Changing dimensions can shift elements. Run on a copy first.
+// ─────────────────────────────────────────────────────────────────────────────
+
+function standardiseDimensions() {
+  var pres = SlidesApp.getActivePresentation();
+
+  // ── YOUR RULES ────────────────────────────────────────────────────────────
+  var TARGET_WIDTH_PT  = 10  * 72; // 10 inches — standard 4:3 width
+  var TARGET_HEIGHT_PT = 7.5 * 72; // 7.5 inches — standard 4:3 height
+  // For 16:9 widescreen: width = 13.33 * 72, height = 7.5 * 72
+  // ─────────────────────────────────────────────────────────────────────────
+
+  var currentWidth  = pres.getPageWidth();
+  var currentHeight = pres.getPageHeight();
+  Logger.log("Current dimensions: " + (currentWidth/72).toFixed(2) + " x " + (currentHeight/72).toFixed(2) + " inches");
+
+  // Skip if dimensions are already correct
+  if (Math.abs(currentWidth - TARGET_WIDTH_PT) < 1 &&
+      Math.abs(currentHeight - TARGET_HEIGHT_PT) < 1) {
+    Logger.log("Dimensions already correct — no changes made.");
+    return;
+  }
+
+  try {
+    pres.setPageWidth(TARGET_WIDTH_PT);
+    pres.setPageHeight(TARGET_HEIGHT_PT);
+    Logger.log("Dimensions set to " + (TARGET_WIDTH_PT/72) + " x " + (TARGET_HEIGHT_PT/72) + " inches.");
+  } catch(e) {
+    Logger.log("Failed to set dimensions — " + e);
+  }
+
+  Logger.log("Script 6 (standardiseDimensions) complete.");
+}
+
+
+
+
+// ─────────────────────────────────────────────────────────────────────────────
+// SCRIPT 7 — STANDARDISE LINE SPACING
+// Sets line spacing to single (100%) on all body text across all slides.
+// Applies paragraph by paragraph for full coverage.
+// Skips the title element on each slide.
+// ─────────────────────────────────────────────────────────────────────────────
+
+function standardiseLineSpacing() {
+  var pres = SlidesApp.getActivePresentation();
+  var slides = pres.getSlides();
+
+  // ── YOUR RULES ────────────────────────────────────────────────────────────
+  var LINE_SPACING = 100; // 100 = single. Use 150 for 1.5x, 200 for double.
+  // ─────────────────────────────────────────────────────────────────────────
+
+  var TOP_ZONE_PT = 1.5 * 72;
+
+  slides.forEach(function(slide, i) {
+    var elements = slide.getPageElements();
+
+    // Identify the title to skip it
+    var titleElement = null;
+    var highestTop = Infinity;
+    elements.forEach(function(el) {
+      var topPos;
+      try { topPos = el.getTop(); } catch(e) { return; }
+      if (topPos > TOP_ZONE_PT) return;
+      var text = null;
+      try { text = el.asShape().getText().asString().trim(); } catch(e) { return; }
+      if (!text) return;
+      if (topPos < highestTop) { highestTop = topPos; titleElement = el; }
+    });
+
+    elements.forEach(function(el) {
+      if (el === titleElement) return;
+
+      var textFrame;
+      try { textFrame = el.asShape().getText(); } catch(e) { return; }
+
+      try {
+        var paragraphs = textFrame.getParagraphs();
+        paragraphs.forEach(function(para) {
+          para.getRange().getParagraphStyle().setLineSpacing(LINE_SPACING);
+        });
+        Logger.log("Slide " + (i+1) + ": line spacing set.");
+      } catch(e) {
+        Logger.log("Slide " + (i+1) + ": could not set line spacing — " + e);
+      }
+    });
+  });
+
+  Logger.log("Script 7 (standardiseLineSpacing) complete.");
+}
+
+
+
+
+// ─────────────────────────────────────────────────────────────────────────────
+// SCRIPT 8 — STANDARDISE FONT
+// Applies Palatino Linotype to all text on all slides.
+// Titles get size 25, all other text gets size 18.
+// Does NOT change bold, italic, underline or colour.
+// ─────────────────────────────────────────────────────────────────────────────
+
+function standardiseFont() {
+  var pres = SlidesApp.getActivePresentation();
+  var slides = pres.getSlides();
+
+  // ── YOUR RULES ────────────────────────────────────────────────────────────
+  var FONT_FAMILY     = "Palatino Linotype";
+  var TITLE_FONT_SIZE = 25;
+  var BODY_FONT_SIZE  = 18;
+  // ─────────────────────────────────────────────────────────────────────────
+
+  var TOP_ZONE_PT = 1.5 * 72;
+
+  slides.forEach(function(slide, i) {
+    var elements = slide.getPageElements();
+
+    // Identify the title
+    var titleElement = null;
+    var highestTop = Infinity;
+    elements.forEach(function(el) {
+      var topPos;
+      try { topPos = el.getTop(); } catch(e) { return; }
+      if (topPos > TOP_ZONE_PT) return;
+      var text = null;
+      try { text = el.asShape().getText().asString().trim(); } catch(e) { return; }
+      if (!text) return;
+      if (topPos < highestTop) { highestTop = topPos; titleElement = el; }
+    });
+
+    elements.forEach(function(el) {
+      var isTitle = (el === titleElement);
+      var fontSize = isTitle ? TITLE_FONT_SIZE : BODY_FONT_SIZE;
+
+      var textRange;
+      try { textRange = el.asShape().getText(); } catch(e) { return; }
+
+      try {
+        var style = textRange.getTextStyle();
+        style.setFontFamily(FONT_FAMILY);
+        style.setFontSize(fontSize);
+        Logger.log("Slide " + (i+1) + ": " + (isTitle ? "title" : "body") + " font set.");
+      } catch(e) {
+        Logger.log("Slide " + (i+1) + ": could not set font — " + e);
+      }
+    });
+  });
+
+  Logger.log("Script 8 (standardiseFont) complete.");
+}
+
+
+
+
+// ─────────────────────────────────────────────────────────────────────────────
+// SCRIPT 9 — STANDARDISE TEXT BOX WIDTH
+// Trims any body text box wider than 11.75 inches to fit within the right guide.
+// Only affects boxes that are too wide — boxes within the limit are untouched.
+// Skips the title element on each slide.
+// ─────────────────────────────────────────────────────────────────────────────
+
+function standardiseTextBoxWidth() {
+  var pres = SlidesApp.getActivePresentation();
+  var slides = pres.getSlides();
+
+  // ── YOUR RULES ────────────────────────────────────────────────────────────
+  var TARGET_WIDTH_PT = 11.75 * 72; // 11.75 inches — matches title box width
+  // ─────────────────────────────────────────────────────────────────────────
+
+  var TOP_ZONE_PT = 1.5 * 72;
+
+  slides.forEach(function(slide, i) {
+    var elements = slide.getPageElements();
+
+    // Identify the title to skip it
+    var titleElement = null;
+    var highestTop = Infinity;
+    elements.forEach(function(el) {
+      var topPos;
+      try { topPos = el.getTop(); } catch(e) { return; }
+      if (topPos > TOP_ZONE_PT) return;
+      var text = null;
+      try { text = el.asShape().getText().asString().trim(); } catch(e) { return; }
+      if (!text) return;
+      if (topPos < highestTop) { highestTop = topPos; titleElement = el; }
+    });
+
+    elements.forEach(function(el) {
+      if (el === titleElement) return;
+
+      try { el.asShape().getText(); } catch(e) { return; }
+
+      try {
+        var currentWidth = el.getWidth();
+        if (currentWidth > TARGET_WIDTH_PT) {
+          el.setWidth(TARGET_WIDTH_PT);
+          Logger.log(
+            "Slide " + (i+1) + ": trimmed from " +
+            (currentWidth/72).toFixed(2) + " to " +
+            (TARGET_WIDTH_PT/72).toFixed(2) + " inches."
+          );
+        } else {
+          Logger.log("Slide " + (i+1) + ": width within limit, no change.");
+        }
+      } catch(e) {
+        Logger.log("Slide " + (i+1) + ": could not resize — " + e);
+      }
+    });
+  });
+
+  Logger.log("Script 9 (standardiseTextBoxWidth) complete.");
+}
