@@ -1,6 +1,6 @@
 ![GitHub repo size](https://img.shields.io/github/repo-size/sravanpallapothu/google-slides-formatting-scripts)
 ![GitHub contributors](https://img.shields.io/github/contributors/sravanpallapothu/google-slides-formatting-scripts)
-![Last Commit](https://img.shields.io/github/contributors/sravanpallapothu/google-slides-formatting-scripts)
+![Last Commit](https://img.shields.io/github/last-commit/sravanpallapothu/google-slides-formatting-scripts)
 
 
 # Google Slides Formatter — Apps Script Collection
